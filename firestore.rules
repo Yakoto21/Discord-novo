@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Catch-All Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    // Test connection document for initial boot verification
+    match /test/{testId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 2. Users Collection
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if isValidId(userId);
+      allow delete: if false;
+    }
+
+    // 3. Servers Collection
+    match /servers/{serverId} {
+      allow read: if true;
+      allow create, update, delete: if isValidId(serverId);
+    }
+
+    // 4. Channels Collection
+    match /channels/{channelId} {
+      allow read: if true;
+      allow create, update, delete: if isValidId(channelId);
+    }
+
+    // 5. Messages Collection
+    match /messages/{messageId} {
+      allow read: if true;
+      allow create, update, delete: if isValidId(messageId);
+    }
+  }
+}

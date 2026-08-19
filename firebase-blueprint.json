@@ -1,0 +1,92 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with status, roles, theme preferences and avatar information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "username": { "type": "string", "maxLength": 64 },
+        "discriminator": { "type": "string", "maxLength": 8 },
+        "email": { "type": "string", "format": "email", "maxLength": 128 },
+        "avatarUrl": { "type": "string", "maxLength": 1024 },
+        "status": { "type": "string", "enum": ["online", "idle", "dnd", "offline"] },
+        "customStatus": { "type": "string", "maxLength": 256 },
+        "bio": { "type": "string", "maxLength": 1024 },
+        "bannerUrl": { "type": "string", "maxLength": 1024 },
+        "bannerColor": { "type": "string", "maxLength": 32 },
+        "pronouns": { "type": "string", "maxLength": 64 },
+        "themeColor": { "type": "string", "maxLength": 32 },
+        "role": { "type": "string", "enum": ["admin", "moderator", "member"] },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "username", "status", "role"]
+    },
+    "Server": {
+      "title": "Server",
+      "description": "Discord guild/server containing channels and settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "iconUrl": { "type": "string", "maxLength": 1024 },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "description": { "type": "string", "maxLength": 1024 },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "name", "ownerId"]
+    },
+    "Channel": {
+      "title": "Channel",
+      "description": "Chat, voice or focus channel within a server",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "serverId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "type": { "type": "string", "enum": ["text", "voice", "dm", "focus"] },
+        "category": { "type": "string", "maxLength": 64 },
+        "topic": { "type": "string", "maxLength": 512 },
+        "position": { "type": "number" },
+        "unreadCount": { "type": "number" }
+      },
+      "required": ["id", "name", "type"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Message sent in a channel with attachments, reactions and thread support",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "channelId": { "type": "string", "maxLength": 128 },
+        "content": { "type": "string", "maxLength": 4000 },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "edited": { "type": "boolean" },
+        "isPinned": { "type": "boolean" },
+        "parentMessageId": { "type": "string", "maxLength": 128 },
+        "threadCount": { "type": "number" },
+        "threadLastReplyAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "channelId", "content", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Registered and authenticated user profiles"
+    },
+    "/servers/{serverId}": {
+      "schema": { "$ref": "#/entities/Server" },
+      "description": "Servers and community spaces"
+    },
+    "/channels/{channelId}": {
+      "schema": { "$ref": "#/entities/Channel" },
+      "description": "Text, voice and focus channels"
+    },
+    "/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Channel messages and threaded replies"
+    }
+  }
+}

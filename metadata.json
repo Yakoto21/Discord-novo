@@ -1,0 +1,12 @@
+{
+  "name": "Remix Discord Clone",
+  "description": "Base completa de clone do Discord com chat em tempo real via Socket.io, salas de voz/vídeo WebRTC e autenticação robusta em Node.js/Express.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "display-capture"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
