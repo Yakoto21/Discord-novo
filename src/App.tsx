@@ -21,8 +21,6 @@ import { ServerSettingsModal } from './components/modals/ServerSettingsModal';
 import { UserSettingsModal } from './components/modals/UserSettingsModal';
 import { UserProfilePopover } from './components/modals/UserProfilePopover';
 import { KeyboardShortcutsModal } from './components/modals/KeyboardShortcutsModal';
-import { WindowsTitlebar } from './components/desktop/WindowsTitlebar';
-import { WindowsAppModal } from './components/desktop/WindowsAppModal';
 import { GlobalSystemConfig } from './components/modals/AdminControlPanel';
 import { Mic, Headphones, Keyboard, AlertTriangle, ShieldCheck, Zap } from 'lucide-react';
 
@@ -87,7 +85,6 @@ export default function App() {
   const [targetSettingsServer, setTargetSettingsServer] = useState<ServerGuild | null>(null);
   const [showUserSettingsModal, setShowUserSettingsModal] = useState(false);
   const [userSettingsInitialTab, setUserSettingsInitialTab] = useState<'account' | 'profile' | 'voice_video' | 'appearance' | 'security' | 'keybinds' | 'admin'>('account');
-  const [showWindowsAppModal, setShowWindowsAppModal] = useState(false);
   const [popoverUser, setPopoverUser] = useState<User | null>(null);
 
   // Configuração Global de Sistema do Painel de Administrador
@@ -995,12 +992,6 @@ export default function App() {
         id="auth-gate-root"
         className="fixed inset-0 h-full w-full overflow-hidden bg-[#04060c] text-slate-100 font-sans antialiased select-none relative flex flex-col items-center justify-center"
       >
-        <WindowsTitlebar
-          appTitle={systemConfig.appTitle}
-          onOpenWindowsAppModal={() => setShowWindowsAppModal(true)}
-          isAdmin={false}
-        />
-
         {/* Fundo Atmosférico */}
         <div className="absolute top-[-10%] left-[-5%] w-[50vw] h-[50vw] rounded-full blur-[140px] pointer-events-none opacity-20 bg-cyan-500" />
         <div className="absolute bottom-[-10%] right-[-5%] w-[50vw] h-[50vw] rounded-full blur-[140px] pointer-events-none opacity-15 bg-purple-600" />
@@ -1014,11 +1005,6 @@ export default function App() {
             api.getMembers().then((res) => setMembers(res.members)).catch(() => {});
           }}
         />
-
-        <WindowsAppModal
-          isOpen={showWindowsAppModal}
-          onClose={() => setShowWindowsAppModal(false)}
-        />
       </div>
     );
   }
@@ -1029,17 +1015,6 @@ export default function App() {
       style={{ backgroundColor: themeBg }}
       className="fixed inset-0 h-full w-full overflow-hidden text-slate-100 font-sans antialiased select-none relative transition-colors duration-500 flex flex-col"
     >
-      {/* 0. Barra de Título Nativa Estilo Windows / Electron */}
-      <WindowsTitlebar
-        appTitle={systemConfig.appTitle}
-        onOpenWindowsAppModal={() => setShowWindowsAppModal(true)}
-        isAdmin={currentUser?.role === 'admin'}
-        onOpenAdminPanel={() => {
-          setUserSettingsInitialTab('admin');
-          setShowUserSettingsModal(true);
-        }}
-      />
-
       {/* 0.1 Transmissão Global de Administrador (Broadcast Banner) */}
       {systemConfig.activeBroadcast?.active && (
         <div
@@ -1444,12 +1419,6 @@ export default function App() {
         systemConfig={systemConfig}
         onUpdateSystemConfig={(patch) => setSystemConfig((prev) => ({ ...prev, ...patch }))}
         initialTab={userSettingsInitialTab}
-      />
-
-      {/* Modal de Download & Execução do App Windows (.exe / Portable) */}
-      <WindowsAppModal
-        isOpen={showWindowsAppModal}
-        onClose={() => setShowWindowsAppModal(false)}
       />
 
       {/* Modal de Autenticação */}

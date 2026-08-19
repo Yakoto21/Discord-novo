@@ -58,58 +58,6 @@ async function startServer() {
   app.use('/api/auth', authRoutes);
   app.use('/api/channels', channelRoutes);
 
-  // Rotas de Download de Executáveis Portáteis (.EXE) e Instaladores Oficiais
-  app.get('/api/download/portable-exe', (_req, res) => {
-    const portablePath = path.join(process.cwd(), 'dist-electron-packages', 'DiscordQuantum-Portable.exe');
-    const directPath = path.join(process.cwd(), 'Discord-Quantum-Portable.exe');
-    
-    res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
-    res.setHeader('Content-Disposition', 'attachment; filename="Discord-Quantum-Portable.exe"');
-
-    // Se o binário pré-empacotado existir, envia diretamente
-    res.sendFile(directPath, (err) => {
-      if (err) {
-        res.sendFile(portablePath, (err2) => {
-          if (err2) {
-            // Cria um executável portátil auto-executável ou pacote direto
-            const fallbackPath = path.join(process.cwd(), 'iniciar-discord.bat');
-            res.download(fallbackPath, 'Discord-Quantum-Portable.exe', (err3) => {
-              if (err3 && !res.headersSent) {
-                res.status(500).json({ error: 'Erro ao gerar binário executável portátil.' });
-              }
-            });
-          }
-        });
-      }
-    });
-  });
-
-  app.get('/api/download/setup-exe', (_req, res) => {
-    const setupPath = path.join(process.cwd(), 'dist-electron-packages', 'Discord-Quantum-Setup.exe');
-    res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
-    res.setHeader('Content-Disposition', 'attachment; filename="Discord-Quantum-Setup.exe"');
-    res.sendFile(setupPath, (err) => {
-      if (err) {
-        const fallbackPath = path.join(process.cwd(), 'iniciar-discord.bat');
-        res.download(fallbackPath, 'Discord-Quantum-Setup.exe', (err2) => {
-          if (err2 && !res.headersSent) {
-            res.status(500).json({ error: 'Erro ao transferir instalador executável.' });
-          }
-        });
-      }
-    });
-  });
-
-  // Rota de Download do Script de Instalação e Execução do Windows
-  app.get('/api/download/installer-bat', (_req, res) => {
-    const filePath = path.join(process.cwd(), 'instalar-windows.bat');
-    res.download(filePath, 'Discord-Quantum-Instalador.bat', (err) => {
-      if (err && !res.headersSent) {
-        res.status(500).json({ error: 'Erro ao transferir instalador.' });
-      }
-    });
-  });
-
   // Rota 404 dedicada para APIs não encontradas (retorna JSON e não HTML da SPA)
   app.all('/api/*', (_req, res) => {
     res.status(404).json({ error: 'Endpoint da API não encontrado.' });
