@@ -204,6 +204,15 @@ export async function getServers(): Promise<ServerGuild[]> {
   }
 }
 
+export async function deleteServerDoc(serverId: string): Promise<void> {
+  const path = `servers/${serverId}`;
+  try {
+    await deleteDoc(doc(db, 'servers', serverId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
 // ================= CHANNEL OPERATIONS =================
 export async function saveChannel(channel: Channel): Promise<void> {
   const path = `channels/${channel.id}`;

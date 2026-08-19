@@ -46,7 +46,56 @@ import {
   getChannelMessages,
   saveServer,
   saveChannel,
+  deleteServerDoc,
+  deleteChannelDoc,
 } from './services/firestoreService';
+
+// Persistência local para garantir que servidores deletados ou criados não voltem ao dar F5
+const STORAGE_SERVERS_KEY = 'discord_quantum_saved_servers_v2';
+const STORAGE_DELETED_SERVERS_KEY = 'discord_quantum_deleted_server_ids_v2';
+const STORAGE_CHANNELS_KEY = 'discord_quantum_saved_channels_v2';
+
+const getDeletedServerIds = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem(STORAGE_DELETED_SERVERS_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+};
+
+const saveDeletedServerId = (id: string) => {
+  try {
+    const deleted = getDeletedServerIds();
+    deleted.add(id);
+    localStorage.setItem(STORAGE_DELETED_SERVERS_KEY, JSON.stringify(Array.from(deleted)));
+  } catch {}
+};
+
+const getInitialStoredServers = (): ServerGuild[] => {
+  try {
+    const deleted = getDeletedServerIds();
+    const raw = localStorage.getItem(STORAGE_SERVERS_KEY);
+    if (raw) {
+      const parsed: ServerGuild[] = JSON.parse(raw);
+      const filtered = parsed.filter((s) => !deleted.has(s.id));
+      if (filtered.length > 0) return filtered;
+    }
+    return INITIAL_SERVERS.filter((s) => !deleted.has(s.id));
+  } catch {
+    return INITIAL_SERVERS;
+  }
+};
+
+const getInitialStoredChannels = (): Record<string, Channel[]> => {
+  try {
+    const raw = localStorage.getItem(STORAGE_CHANNELS_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch {}
+  return {};
+};
 
 export default function App() {
   // Estado de Autenticação e Usuário Conectado
@@ -54,12 +103,15 @@ export default function App() {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   // Estados de Servidores e Navegação
-  const [servers, setServers] = useState<ServerGuild[]>(INITIAL_SERVERS);
-  const [activeServerId, setActiveServerId] = useState<string>('guild-main');
+  const [servers, setServers] = useState<ServerGuild[]>(getInitialStoredServers);
+  const [activeServerId, setActiveServerId] = useState<string>(() => {
+    const initServers = getInitialStoredServers();
+    return initServers[0]?.id || 'home';
+  });
   const [homeTab, setHomeTab] = useState<string>('friends');
 
   // Estados de Canais e Mensagens
-  const [channelsByServer, setChannelsByServer] = useState<Record<string, Channel[]>>({});
+  const [channelsByServer, setChannelsByServer] = useState<Record<string, Channel[]>>(getInitialStoredChannels);
   const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
   const [activeVoiceChannel, setActiveVoiceChannel] = useState<Channel | null>(null);
   const [viewMode, setViewMode] = useState<'chat' | 'voice'>('chat');
@@ -181,36 +233,56 @@ export default function App() {
           api.getMembers(),
         ]);
 
-        const initialMap: Record<string, Channel[]> = {};
-        INITIAL_SERVERS.forEach((srv) => {
-          initialMap[srv.id] = srv.channels ? [...srv.channels] : [];
-        });
+        const deleted = getDeletedServerIds();
+        const currentServers = getInitialStoredServers();
 
-        // Mescla e deduplica canais da API no guild-main
-        if (channelsRes.channels && channelsRes.channels.length > 0) {
-          const channelMap = new Map<string, Channel>();
-          (INITIAL_SERVERS[0].channels || []).forEach((c) => channelMap.set(c.id, c));
-          channelsRes.channels.forEach((c: Channel) => channelMap.set(c.id, c));
-          initialMap['guild-main'] = Array.from(channelMap.values());
-        }
+        setChannelsByServer((prevMap) => {
+          const initialMap: Record<string, Channel[]> = { ...prevMap };
 
-        // Garante unicidade absoluta de IDs em todos os servidores
-        Object.keys(initialMap).forEach((srvId) => {
-          const seen = new Set<string>();
-          initialMap[srvId] = initialMap[srvId].filter((c) => {
-            if (!c?.id || seen.has(c.id)) return false;
-            seen.add(c.id);
-            return true;
+          currentServers.forEach((srv) => {
+            if (!deleted.has(srv.id) && (!initialMap[srv.id] || initialMap[srv.id].length === 0)) {
+              initialMap[srv.id] = srv.channels ? [...srv.channels] : [];
+            }
           });
+
+          // Mescla e deduplica canais da API no primeiro servidor se disponível
+          const mainServer = currentServers[0];
+          if (mainServer && !deleted.has(mainServer.id) && channelsRes.channels && channelsRes.channels.length > 0) {
+            const channelMap = new Map<string, Channel>();
+            (initialMap[mainServer.id] || []).forEach((c) => channelMap.set(c.id, c));
+            channelsRes.channels.forEach((c: Channel) => channelMap.set(c.id, c));
+            initialMap[mainServer.id] = Array.from(channelMap.values());
+          }
+
+          // Garante unicidade de IDs e remove canais de servidores deletados
+          Object.keys(initialMap).forEach((srvId) => {
+            if (deleted.has(srvId)) {
+              delete initialMap[srvId];
+              return;
+            }
+            const seen = new Set<string>();
+            initialMap[srvId] = (initialMap[srvId] || []).filter((c) => {
+              if (!c?.id || seen.has(c.id)) return false;
+              seen.add(c.id);
+              return true;
+            });
+          });
+
+          try {
+            localStorage.setItem(STORAGE_CHANNELS_KEY, JSON.stringify(initialMap));
+          } catch {}
+
+          if (mainServer && !activeChannel) {
+            const defaultChan = (initialMap[mainServer.id] || []).find((c) => c.type === 'text') || (initialMap[mainServer.id] || [])[0];
+            if (defaultChan) {
+              setActiveChannel(defaultChan);
+            }
+          }
+
+          return initialMap;
         });
 
-        setChannelsByServer(initialMap);
         setMembers(membersRes.members);
-
-        const defaultChan = (initialMap['guild-main'] || []).find((c) => c.type === 'text') || (initialMap['guild-main'] || [])[0];
-        if (defaultChan) {
-          setActiveChannel(defaultChan);
-        }
       } catch (err) {
         console.error('Erro ao carregar dados iniciais:', err);
       }
@@ -677,8 +749,22 @@ export default function App() {
       { id: `c-${Date.now()}-3`, name: 'Palco de Voz', type: 'voice', serverId: newServerId, position: 2 },
     ];
 
-    setServers((prev) => [...prev, newServer]);
-    setChannelsByServer((prev) => ({ ...prev, [newServerId]: initialServerChannels }));
+    setServers((prev) => {
+      const updated = [...prev, newServer];
+      try {
+        localStorage.setItem(STORAGE_SERVERS_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    setChannelsByServer((prev) => {
+      const updated = { ...prev, [newServerId]: initialServerChannels };
+      try {
+        localStorage.setItem(STORAGE_CHANNELS_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
     setActiveServerId(newServerId);
     setActiveChannel(initialServerChannels[0]);
     setViewMode('chat');
@@ -689,15 +775,30 @@ export default function App() {
 
   const handleJoinPublicServer = (server: ServerGuild) => {
     if (!servers.some((s) => s.id === server.id)) {
-      setServers((prev) => [...prev, server]);
-      setChannelsByServer((prev) => ({
-        ...prev,
-        [server.id]: [
-          { id: `c-${server.id}-1`, name: 'geral', type: 'text', serverId: server.id, position: 0 },
-          { id: `c-${server.id}-2`, name: 'bate-papo', type: 'text', serverId: server.id, position: 1 },
-          { id: `c-${server.id}-3`, name: 'Frequência Coletiva', type: 'voice', serverId: server.id, position: 2 },
-        ],
-      }));
+      const serverChannels = [
+        { id: `c-${server.id}-1`, name: 'geral', type: 'text' as const, serverId: server.id, position: 0 },
+        { id: `c-${server.id}-2`, name: 'bate-papo', type: 'text' as const, serverId: server.id, position: 1 },
+        { id: `c-${server.id}-3`, name: 'Frequência Coletiva', type: 'voice' as const, serverId: server.id, position: 2 },
+      ];
+
+      setServers((prev) => {
+        const updated = [...prev, server];
+        try {
+          localStorage.setItem(STORAGE_SERVERS_KEY, JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+
+      setChannelsByServer((prev) => {
+        const updated = {
+          ...prev,
+          [server.id]: serverChannels,
+        };
+        try {
+          localStorage.setItem(STORAGE_CHANNELS_KEY, JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
     }
     handleSelectServer(server.id);
   };
@@ -717,10 +818,14 @@ export default function App() {
 
     setChannelsByServer((prev) => {
       const currentList = prev[activeServerId] || [];
-      return {
+      const updated = {
         ...prev,
         [activeServerId]: [...currentList, newChannel],
       };
+      try {
+        localStorage.setItem(STORAGE_CHANNELS_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
     });
 
     saveChannel(newChannel).catch((err) => console.warn('Sync channel to Firestore:', err));
@@ -738,25 +843,57 @@ export default function App() {
 
   const handleUpdateCurrentServer = (updated: Partial<ServerGuild>) => {
     const targetId = targetSettingsServer?.id || activeServerId;
-    setServers((prev) =>
-      prev.map((s) => {
+    setServers((prev) => {
+      const updatedList = prev.map((s) => {
         if (s.id === targetId) {
           const updatedServer = { ...s, ...updated };
           saveServer(updatedServer).catch((err) => console.warn('Sync server update to Firestore:', err));
           return updatedServer;
         }
         return s;
-      })
-    );
+      });
+      try {
+        localStorage.setItem(STORAGE_SERVERS_KEY, JSON.stringify(updatedList));
+      } catch {}
+      return updatedList;
+    });
   };
 
   const handleDeleteCurrentServer = (serverId: string) => {
-    setServers((prev) => prev.filter((s) => s.id !== serverId));
+    saveDeletedServerId(serverId);
+    deleteServerDoc(serverId).catch(() => {});
+
+    setServers((prev) => {
+      const updated = prev.filter((s) => s.id !== serverId);
+      try {
+        localStorage.setItem(STORAGE_SERVERS_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    setChannelsByServer((prev) => {
+      const nextMap = { ...prev };
+      delete nextMap[serverId];
+      try {
+        localStorage.setItem(STORAGE_CHANNELS_KEY, JSON.stringify(nextMap));
+      } catch {}
+      return nextMap;
+    });
+
     if (activeServerId === serverId) {
-      setActiveServerId('guild-main');
-      const mainChannels = channelsByServer['guild-main'] || [];
-      if (mainChannels.length > 0) setActiveChannel(mainChannels[0]);
+      const remainingServers = servers.filter((s) => s.id !== serverId);
+      if (remainingServers.length > 0) {
+        const nextServer = remainingServers[0];
+        setActiveServerId(nextServer.id);
+        const serverChannels = channelsByServer[nextServer.id] || nextServer.channels || [];
+        const nextChan = serverChannels.find((c) => c.type === 'text') || serverChannels[0] || null;
+        setActiveChannel(nextChan);
+      } else {
+        setActiveServerId('home');
+        setActiveChannel(null);
+      }
     }
+
     if (targetSettingsServer?.id === serverId) {
       setTargetSettingsServer(null);
       setShowServerSettingsModal(false);
