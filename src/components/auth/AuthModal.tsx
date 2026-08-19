@@ -162,35 +162,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleQuickLogin = async (quickEmail: string, quickPass: string) => {
-    setEmail(quickEmail);
-    setPassword(quickPass);
-    setFieldErrors({});
-    setLoading(true);
-    setError(null);
-    setErrorDetails(null);
-    setRemainingAttempts(null);
-
-    try {
-      const res = await api.login(quickEmail, quickPass);
-      setAuthToken(res.token);
-      onSuccess(res.user);
-      onClose();
-    } catch (err: any) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-        setErrorDetails(err.details || null);
-        if (err.status === 429) {
-          setLockoutSeconds((err as any).retryAfter || 300);
-        }
-      } else {
-        setError('Erro no login rápido.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div 
       id="auth-modal-backdrop"
@@ -476,37 +447,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               )}
             </button>
           </form>
-
-          {/* Quick-fill accounts */}
-          <div className="mt-6 pt-5 border-t border-slate-800/80">
-            <div className="flex items-center justify-between mb-2.5">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Terminal className="w-3.5 h-3.5 text-cyan-400" />
-                Acesso Rápido de Administrador:
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2.5">
-              <button
-                type="button"
-                id="btn-quick-admin"
-                onClick={() => handleQuickLogin('luiz.g.albino@gmail.com', 'DiscordDev@2026')}
-                className="bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 hover:border-cyan-500/40 rounded-xl p-3 text-left transition-all cursor-pointer group flex items-center justify-between"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-xs text-white group-hover:text-cyan-300 transition-colors">Luiz Albino</span>
-                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/50">Admin Master</span>
-                  </div>
-                  <div className="text-[10px] text-slate-400 font-mono mt-0.5">luiz.g.albino@gmail.com</div>
-                </div>
-                <div className="text-xs font-semibold text-cyan-400 flex items-center gap-1">
-                  <span>Entrar</span>
-                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
